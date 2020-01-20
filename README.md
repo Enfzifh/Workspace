@@ -1,5 +1,5 @@
 # Workspace
-Tous les dossiers comportant le TP et le projet
+Tous les dossiers, fichiers et ressources liés au TP de RT0704 et au projet
 
 ## Réponses et présentation des solutions du TP
 Toutes les réponses présenter par étapes pour les questions du TP
