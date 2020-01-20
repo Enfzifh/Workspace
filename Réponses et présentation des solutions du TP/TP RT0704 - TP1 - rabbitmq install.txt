@@ -1,0 +1,196 @@
+######################### ETAT TP 1 RT0704 ##########################
+
+#####################################################################
+
+# installer erlang
+
+# import Erlang repository GPG key
+wget -O- https://packages.erlang-solutions.com/ubuntu/erlang_solutions.asc | sudo apt-key add -
+
+# add erlang repo
+echo "deb https://packages.erlang-solutions.com/ubuntu bionic contrib" | sudo tee /etc/apt/sources.list.d/rabbitmq.list
+
+# install erlang
+sudo apt update
+sudo apt -y install erlang
+
+# start erl shell to see if it's ok
+erl
+
+# import rabbitmq
+wget -O- https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc | sudo apt-key add -
+wget -O- https://www.rabbitmq.com/rabbitmq-release-signing-key.asc | sudo apt-key add -
+
+# add rabbitmq repo
+echo "deb https://dl.bintray.com/rabbitmq/debian $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/rabbitmq.list
+
+# install rabbitmq server
+sudo apt update
+sudo apt -y install rabbitmq-server
+
+# check service 
+sudo systemctl status rabbitmq-server.service
+
+# check if service launched at boot
+systemctl is-enabled rabbitmq-server.service
+
+# if disable add it
+sudo systemctl enable rabbitmq-server
+
+# enable rabbitMQ management web dashboard
+sudo rabbitmq-plugins enable rabbitmq_management
+
+-> The Web service should be listening on TCP port 15672
+
+# check if
+ss -tunelp | grep 15672
+
+# If you have an active UFW firewall, open both ports 5672 and 15672
+sudo ufw allow proto tcp from any to any port 5672,15672
+
+# add forward in virtual box from rien:2523 host to 10.0.2.15:15672 vm
+
+# Access web interface
+http://[server IP|Hostname]:15672
+
+# Login
+-!! only from localhost
+user guest 
+password guest
+
+# create an admin user
+rabbitmqctl add_user admin StrongPassword  (test vm mdp)
+rabbitmqctl set_user_tags admin administrator
+________________1______________________________
+
+# installer l'image officiel de rabbitmq
+docker pull rabbitmq
+
+# lancer daemon rabbitmq
+docker run -d --hostname my-rabbit --name some-rabbit rabbitmq:3
+
+# check for log to see rabbitmq
+docker logs some-rabbit
+
+#############################################################
+
+=INFO REPORT==== 6-Jul-2015::20:47:02 ===
+node           : rabbit@my-rabbit
+home dir       : /var/lib/rabbitmq
+config file(s) : /etc/rabbitmq/rabbitmq.config
+cookie hash    : UoNOcDhfxW9uoZ92wh6BjA==
+log            : tty
+sasl log       : tty
+database dir   : /var/lib/rabbitmq/mnesia/rabbit@my-rabbit
+
+#############################################################
+
+
+____________________________________________________________________
+
+### RabbitMQ Management commands ### 
+
+#Lister les queue existantes
+sudo rabbitmqctl list_queues
+
+# supprimer une queue
+sudo rabbitmqctl delete_queue rfe
+
+### RabbitMQ User Management Commands ### 
+
+# Delete User:
+rabbitmqctl delete_user user
+
+# Change User Password:
+rabbitmqctl change_password user strongpassword
+
+# Create new Virtualhost:
+rabbitmqctl add_vhost /my_vhost
+
+# List available Virtualhosts:
+rabbitmqctl list_vhosts
+
+# Delete a virtualhost:
+rabbitmqctl delete_vhost /myvhost
+
+# Grant user permissions for vhost:
+rabbitmqctl set_permissions -p /myvhost user ".*" ".*" ".*"
+
+# List vhost permissions:
+rabbitmqctl list_permissions -p /myvhost
+
+# To list user permissions:
+rabbitmqctl list_user_permissions user
+
+# Delete user permissions:
+rabbitmqctl clear_permissions -p /myvhost user
+
+
+receive.py ##############################################################################################
+######## Recevoir les  messages dans la queue ###########################################################
+#########################################################################################################
+#!/usr/bin/env python3
+# Permet de lire/recevoir un message de la queue et d'afficher le contenu du msg
+import pika
+
+# Etablie une conneixon avec le server RabbitMQ
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+channel = connection.channel()
+
+# Create an hello queue sur laquelle notre message sera lu/reçue
+# on peut déclarer la queue n'importe quel nombre de fois, elle ne sera crée qu'une seule fois
+channel.queue_declare(queue='hello')
+
+# on définit un callback qui sera appelé(par pika) à chaque nouveau message inséré dans la file
+# et affichera le contenu du message
+def callback(ch, method, properties, body):
+    print(" [x] Received %r" % body)
+
+# Reçoit les message de la queue lorsqu'il y a en a
+# on indique à RabbitMQ que le callback définit ci dessus doit recevoir les messages de la queue 'hello'
+# on doit bien sur s'assurer que la queue existe avant de s'abonner à ce callback
+channel.basic_consume(queue='hello',
+                      auto_ack=True,
+                      on_message_callback=callback)
+
+# On boucle en attendant les données et appelons le callback quand message reçu
+print(' [*] Waiting for messages. To exit press CTRL+C')
+channel.start_consuming()
+
+# On ferme la connexion
+connection.close()
+
+#########################################################################################################
+
+send.py ###############################################################################################
+######## Envoyer des messages dans la queue ###########################################################
+#######################################################################################################
+#!/usr/bin/env python3
+# Permet de creer une queue et d'envoyer un message dans la queue
+import pika
+
+# Etablie une conneixon avec le server RabbitMQ
+# ('localhost', 15672, '/', credentials))
+credentials = pika.PlainCredentials('guest', 'guest') 
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+channel = connection.channel()
+
+# Create an hello queue sur laquelle notre message sera délivré
+# on peut déclarer la queue n'importe quel nombre de fois, elle ne sera crée qu'une seule fois
+channel.queue_declare(queue='hello')
+
+# Envoie un message à la queue
+# 1param(exchange): échange par default identifié par une chaine vide
+# 2param(routing_key): on indique à quelle queud on souhaite délivré le message (queue hello içi)
+# 3param(body): le corps du message 
+channel.basic_publish(exchange='', routing_key='hello', body='Hello World!')
+print(" [x] Sent 'Hello World!'")
+
+# On ferme la connexion
+connection.close()
+
+#########################################################################################################
+
+# lancer les scripts et relancer le script send plusieurs fois pour voir les messages
+python receive.py
+python send.py

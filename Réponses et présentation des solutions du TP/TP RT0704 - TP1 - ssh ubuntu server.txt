@@ -1,0 +1,18 @@
+testusrv
+test
+test
+
+RabbitMQ user
+admin
+test
+
+
+# installer lors de l'installation de l'OS
+# faire le forward de rien:2522 host to 10.0.2.15:22 VM
+
+# générer une clé RSA
+
+ssh-keygen -t rsa -b 4096 -C "test@test.com"
+nom clé: test_rsa
+passphrase: test_rsa
+stocker dans : /home/test
